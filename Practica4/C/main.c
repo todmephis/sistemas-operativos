@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include "semaforos.h"
+#include <semaforos.h>
 #define FTOK_CHAR "/bin/ls"
 #define FTOK_INT 1
 #define SLOTSMEMORIA 10
