@@ -36,7 +36,6 @@ int main(int argc, char const **argv) {
   else if((mem_sharedID=shmget(key, sizeof(zonacritica)*SLOTSMEMORIA, 0777 | IPC_EXCL)) == -1 && (semID=semget(key, sem_len, IPC_EXCL | 0777)) == -1){//No existe, se crean
     mem_sharedID = shmget(key, sizeof(zonacritica)*SLOTSMEMORIA, 0777 | IPC_CREAT);//Creamos la memoria compartida
     semID = semget(key,sem_len,IPC_CREAT | 0777);//Se crea el semaforo
-    printf("mem_id:%d\n", mem_sharedID);
     printf("La memoria compartida no existe, voy a crearla [%d]\n", mem_sharedID);
     ZC_local = (zonacritica *)shmat(mem_sharedID, 0, 0);
     for(int semaforo_n = 0; semaforo_n < sem_len; semaforo_n++){
