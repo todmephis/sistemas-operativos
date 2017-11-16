@@ -8,19 +8,19 @@
 #include <unistd.h>
 #include <semaforos.h>
 #define FTOK_CHAR "/bin/ls"
-#define FTOK_INT 1
+#define FTOK_INT 4
 #define SLOTSMEMORIA 10
 #define PRODUCTOR 0
 #define CONSUMIDOR 1
 int main(int argc, char const **argv) {
-	if(argc != 2){
+	if(argc != 3){
 		printf("No args\n");
-		exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
 	}
-  key_t key;
+  key_t key,cont;
   int mem_sharedID, localerror, semID;
   int sem_len = SLOTSMEMORIA + 2;
-  int a = 0;
+  int a = 0, b=-1, c=1, contador=0;
   zonacritica * ZC_local = NULL;
   if ((key=ftok(FTOK_CHAR, FTOK_INT)) == -1) {
     localerror = errno;
@@ -49,25 +49,55 @@ int main(int argc, char const **argv) {
         semctl(semID, semaforo_n, SETVAL, 1);
     }
     printf("Semaforos creados bien shidori\n");
+    for(contador=0;contador<SLOTSMEMORIA;contador++){
+      (ZC_local+contador)->estado = 1;
+    }
   }
   else{
     printf("Algo salio extraño\n");
     exit(EXIT_FAILURE);
   }
-  if(atoi(argv[1])==0){
-    for(int contador = 0; contador < SLOTSMEMORIA; contador++){
-      (ZC_local+contador)->estado = 1;
-      strcpy((ZC_local+contador)->espacio, "hola");
+  if(atoi(argv[1])==PRODUCTOR){
+  while(1){
+    for(contador = 0; contador < SLOTSMEMORIA; contador++){  
+          if(c==4){
+            exit(0);
+          }
+        b = semctl(semID, contador + 2, GETVAL, NULL);
+        if(b==1 && (ZC_local+contador)->estado == 1){//1 significa semaforo verde y puedo escribir
+          wait1(contador+2,semID);//pone el semaforo en rojo
+          (ZC_local+contador)->estado = 0;//estado = no puedo escribir
+          for(b=0;b<9;b++){
+            (ZC_local+contador)->espacio[b] = atoi(argv[2]);
+          }
+          signal1(contador+2,semID);
+          c++;
+
+        }
+        else{
+          continue;
+        }
+      }
     }
-    printf("Ya llené\n");
   }
-  else if(atoi(argv[1])==1){
+  else if(atoi(argv[1])==CONSUMIDOR){
+    c=0;
+  while(1){
     for(int contador = 0; contador < SLOTSMEMORIA; contador++){
-      a = semctl(semID, contador, GETVAL, NULL);
-      printf("Zona[%d] Estado:%d Datos:%s Semaforo:%d Valor:%d\n", contador, (ZC_local+contador)->estado, (ZC_local+contador)->espacio, contador, a);
+      b = semctl(semID, contador + 2, GETVAL, NULL);
+      if(b==1 && (ZC_local+contador)->estado == 0){
+        printf("Zona[%d] Estado:%d Datos:%s\n", contador, (ZC_local+contador)->estado, (ZC_local+contador)->espacio);
+        (ZC_local+contador)->estado == 1;
+        c++;
+        if(c==6){
+          semctl(semID, 0, IPC_RMID);
+  shmctl(mem_sharedID, IPC_RMID, 0);
+          exit(0);
+        }
+      }
     }
-    semctl(semID, 0, IPC_RMID);
-    shmctl(mem_sharedID, IPC_RMID, 0);
+  }   
+  
   }
   else{
     printf("No args\n");
