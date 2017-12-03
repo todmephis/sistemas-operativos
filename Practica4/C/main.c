@@ -8,19 +8,41 @@
 #include <unistd.h>
 #include <semaforos.h>
 #define FTOK_CHAR "/bin/ls"
-#define FTOK_INT 4
-#define SLOTSMEMORIA 10
+#define FTOK_INT 94
+#define SLOTSMEMORIA 5
 #define PRODUCTOR 0
 #define CONSUMIDOR 1
+#define N_PRODUC 1000
+void usage(const char *);
+
 int main(int argc, char const **argv) {
 	if(argc != 3){
-		printf("No args\n");
+		fprintf(stderr, "Error en argumentos.\n");
+    usage(argv[0]);
     exit(EXIT_FAILURE);
 	}
-  key_t key,cont;
+  if((atoi(argv[1])<0 && atoi(argv[1])>1)){
+    fprintf(stderr, "Error en argumentos: MODO debe ser 0 ó 1\n");
+    usage(argv[0]);
+    exit(EXIT_FAILURE);
+  }
+  if(((atoi(argv[1]) == 0)  && (atoi(argv[2]) < 32)) || ((atoi(argv[1]) == 0) && (atoi(argv[2]) > 128))){
+    fprintf(stderr, "Error en argumentos: SIMBOLO_ASCII debe ser un caracter imprimible\n");
+    usage(argv[0]);
+    exit(EXIT_FAILURE);
+  }
+  if( atoi(argv[1]) == 1 && atoi(argv[2]) != -1 ){
+    fprintf(stderr, "Error en argumentos: si MODO está activado con 1 entonces SIMBOLO_ASCII debe ser -1\n");
+    usage(argv[0]);
+    exit(EXIT_FAILURE);    
+  }
+
+  key_t key;
   int mem_sharedID, localerror, semID;
   int sem_len = SLOTSMEMORIA + 2;
-  int a = 0, b=-1, c=1, contador=0;
+  int contador = 0;
+  int contador_c = 0, b_c = 0, c_c = 0;
+  int contador_p = 0, b_p = 0, c_p = 0;
   zonacritica * ZC_local = NULL;
   if ((key=ftok(FTOK_CHAR, FTOK_INT)) == -1) {
     localerror = errno;
@@ -48,7 +70,7 @@ int main(int argc, char const **argv) {
       else
         semctl(semID, semaforo_n, SETVAL, 1);
     }
-    printf("Semaforos creados bien shidori\n");
+    printf("Semaforos creados satisfactoriamente\n");
     for(contador=0;contador<SLOTSMEMORIA;contador++){
       (ZC_local+contador)->estado = 1;
     }
@@ -59,49 +81,75 @@ int main(int argc, char const **argv) {
   }
   if(atoi(argv[1])==PRODUCTOR){
   while(1){
-    for(contador = 0; contador < SLOTSMEMORIA; contador++){  
-          if(c==4){
-            exit(0);
+    for(contador_p = 0; contador_p < SLOTSMEMORIA; contador_p++){     
+        if(semctl(semID, contador_p + 2, GETVAL, NULL)==1){//1 significa semaforo verde y puedo escribir
+           if(semctl(semID, PRODUCTOR, GETVAL, NULL) > 0){
+            if((ZC_local+contador_p)->estado == 1){
+              wait1(PRODUCTOR,semID);
+              wait1(contador_p+2,semID);//pone el semaforo en rojo
+              if((ZC_local+contador_p)->estado == 1){
+                for(b_p=0;b_p<9;b_p++){
+                  (ZC_local+contador_p)->espacio[b_p] = atoi(argv[2]);
+                }
+                c_p++;
+              }
+              (ZC_local+contador_p)->estado = 0;//estado 0 = no puedo escribir
+              signal1(CONSUMIDOR,semID);
+              signal1(contador_p+2,semID);
+              printf("%d\n",c_p);
+              if(c_p>=N_PRODUC){
+                exit(EXIT_SUCCESS);
+              }
+              break;
+            }
           }
-        b = semctl(semID, contador + 2, GETVAL, NULL);
-        if(b==1 && (ZC_local+contador)->estado == 1){//1 significa semaforo verde y puedo escribir
-          wait1(contador+2,semID);//pone el semaforo en rojo
-          (ZC_local+contador)->estado = 0;//estado = no puedo escribir
-          for(b=0;b<9;b++){
-            (ZC_local+contador)->espacio[b] = atoi(argv[2]);
-          }
-          signal1(contador+2,semID);
-          c++;
-
         }
-        else{
-          continue;
-        }
-      }
     }
+  }
   }
   else if(atoi(argv[1])==CONSUMIDOR){
-    c=0;
   while(1){
-    for(int contador = 0; contador < SLOTSMEMORIA; contador++){
-      b = semctl(semID, contador + 2, GETVAL, NULL);
-      if(b==1 && (ZC_local+contador)->estado == 0){
-        printf("Zona[%d] Estado:%d Datos:%s\n", contador, (ZC_local+contador)->estado, (ZC_local+contador)->espacio);
-        (ZC_local+contador)->estado == 1;
-        c++;
-        if(c==6){
-          semctl(semID, 0, IPC_RMID);
-  shmctl(mem_sharedID, IPC_RMID, 0);
-          exit(0);
+    for(contador_c = 0; contador_c < SLOTSMEMORIA; contador_c++){
+      if(semctl(semID, contador_c + 2, GETVAL, NULL)==1){
+        if(semctl(semID, CONSUMIDOR, GETVAL, NULL) > 0){
+          if((ZC_local+contador_c)->estado == 0){
+            wait1(CONSUMIDOR,semID);
+            wait1(contador_c+2,semID);
+            if((ZC_local+contador_c)->estado == 0){
+              printf("Consumo#[%d]Zona[%d] Estado:%d Datos:%s\n", c_c+1, contador_c+1, (ZC_local+contador_c)->estado, (ZC_local+contador_c)->espacio);
+              c_c++;
+            }
+            for(b_c=0;b_c<9;b_c++){
+              (ZC_local+contador_c)->espacio[b_c] = '|';
+            }
+            (ZC_local+contador_c)->estado = 1;
+            signal1(PRODUCTOR,semID);
+            signal1(contador_c+2,semID);
+            if(c_c>=N_PRODUC)
+               exit(EXIT_SUCCESS);
+            break;
+          }
         }
       }
     }
-  }   
-  
+  }    
   }
   else{
-    printf("No args\n");
-    exit(0);
+    fprintf(stderr, "Error en argumentos.\n");
+    usage(argv[0]);
+    exit(EXIT_FAILURE);
   }
   return 0;
 }
+
+void usage(const char * nombreprograma){
+  printf("Usage: %s MODO SIMBOLO_ASCII\n", nombreprograma);
+  printf("MODO:\n0 = PRODUCTOR\n1 = CONSUMIDOR\n\n");
+  printf("Si es un productor entonces SIMBOLO_ASCII será un entero imprimible del código ASCII\n");
+  printf("P.j: %s 0 97\n", nombreprograma);
+  printf("97 en el código ASCII pertenece a la letra 'a'\n");
+  printf("\nSi es un consumidor entonces SIMBOLO_ASCII deberá ser el entero -1\n");
+  printf("P.j: %s 1 -1\n", nombreprograma);
+}
+
+
