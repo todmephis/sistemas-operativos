@@ -26,8 +26,10 @@ int main(void){
 		printf("1.- Crear procesos\n");
 		printf("2.- Eliminar procesos\n");
 		printf("3.- Fragmentar memoria\n");
-		printf("4.- Mostrar memoria y tabla te pagina\n");
-		printf("5.- Recuperar procesos de swap\n");
+		printf("4.- Mostrar memoria y tabla de pagina\n");
+		printf("5.- Mostrar swap y tabla de pagina swap\n");
+		printf("6.- Mostrar cola de procesos\n");
+		printf("7.- Recuperar procesos de swap\n");
 		printf(">> ");
 		scanf("%d", &opt);
 		system("clear");
